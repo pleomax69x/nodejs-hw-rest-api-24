@@ -4,12 +4,18 @@ const schemaContact = Joi.object({
   name: Joi.string().min(3).max(30).required(),
   email: Joi.string().min(3).max(30).required(),
   phone: Joi.string().min(3).max(30).required(),
+  favorite: Joi.boolean().optional(),
 });
 
 const schemaContactUpdate = Joi.object({
-  name: Joi.string().alphanum().min(3).max(30).required(),
-  email: Joi.string().alphanum().min(3).max(30).required(),
-  phone: Joi.number().min(3).max(30).required(),
+  name: Joi.string().min(3).max(30).required(),
+  email: Joi.string().min(3).max(30).required(),
+  phone: Joi.string().min(3).max(30).required(),
+  favorite: Joi.boolean().optional(),
+});
+
+const schemaContactUpdateFavorite = Joi.object({
+  favorite: Joi.boolean().required(),
 });
 
 const validate = async (schema, body, next) => {
@@ -23,6 +29,9 @@ const validate = async (schema, body, next) => {
     if (schema === schemaContactUpdate) {
       next({ status: 400, message: "missing fields" });
     }
+    if (schema === schemaContactUpdateFavorite) {
+      next({ status: 400, message: `missing field favorite` });
+    }
     next({ status: 400, message: err.message });
   }
 };
@@ -32,4 +41,7 @@ module.exports.validateContact = (req, _res, next) => {
 };
 module.exports.validateContactUpdate = (req, _res, next) => {
   return validate(schemaContactUpdate, req.body, next);
+};
+module.exports.validateContactUpdateFavorite = (req, _res, next) => {
+  return validate(schemaContactUpdateFavorite, req.body, next);
 };
