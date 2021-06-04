@@ -1,7 +1,5 @@
 const mongoose = require("mongoose");
 
-// mongoose.set("useFindAndModify", false);
-
 require("dotenv").config();
 const uriDb = process.env.URI_DB;
 
@@ -9,6 +7,7 @@ const db = mongoose.connect(uriDb, {
   useNewUrlParser: true,
   useUnifiedTopology: true,
   useCreateIndex: true,
+  useFindAndModify: false,
   poolSize: 5,
 });
 
