@@ -4,6 +4,12 @@ const Users = require("../model/user-model");
 const { HttpCode } = require("../helpers/constans");
 const UploadAvatar = require("../services/upload-avatars-local");
 
+const EmailService = require("../services/email");
+const {
+  CreateSenderNodemailer,
+  CreateSenderSendgrid,
+} = require("../services/sender-email");
+
 const JWT_SECRET_KEY = process.env.JWT_SECRET_KEY;
 const AVATARS_OF_USERS = process.env.AVATARS_OF_USERS;
 
@@ -18,8 +24,18 @@ const reg = async (req, res, next) => {
       });
     }
     const newUser = await Users.create(req.body);
-    const { id, name, email, gender, subscription, avatar } = newUser;
-    console.log(newUser);
+    const { id, name, email, gender, subscription, avatar, verifyToken } =
+      newUser;
+
+    try {
+      const emailService = new EmailService(
+        process.env.NODE_ENV,
+        new CreateSenderSendgrid()
+      );
+      await emailService.sendVerifyPasswordEmail(verifyToken, email, name);
+    } catch (e) {
+      console.log(e.message);
+    }
     return res.status(HttpCode.CREATED).json({
       status: "success",
       code: HttpCode.CREATED,
@@ -41,6 +57,13 @@ const login = async (req, res, next) => {
         status: "error",
         code: HttpCode.UNAUTHORIZED,
         message: "Email or password is wrong",
+      });
+    }
+    if (!user.verify) {
+      return res.status(HttpCode.UNAUTHORIZED).json({
+        status: "error",
+        code: HttpCode.UNAUTHORIZED,
+        message: "Check email for vertification",
       });
     }
     const payload = { id: user.id };
@@ -113,6 +136,60 @@ const avatars = async (req, res, next) => {
   }
 };
 
+const verify = async (req, res, next) => {
+  try {
+    const user = await Users.getUserByVerifyToken(req.params.token);
+    if (user) {
+      await Users.updateVerifyToken(user.id, true, null);
+      return res.status(HttpCode.OK).json({
+        status: "succes",
+        code: HttpCode.OK,
+        message: "Vertification successful!",
+      });
+    }
+    return res.status(HttpCode.NOT_FOUND).json({
+      status: "error",
+      code: HttpCode.NOT_FOUND,
+      message: "Your vertification token not found",
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+const repeatSendEmailverify = async (req, res, next) => {
+  const user = await Users.findByEmail(req.body.email);
+  if (user) {
+    const { name, email, verifyToken, verify } = user;
+    if (!verify) {
+      try {
+        const emailService = new EmailService(
+          process.env.NODE_ENV,
+          new CreateSenderNodemailer()
+        );
+        await emailService.sendVerifyPasswordEmail(verifyToken, email, name);
+        return res.status(200).json({
+          status: "succes",
+          code: 200,
+          message: "Vertification email resubmited!",
+        });
+      } catch (e) {
+        console.log(e.message);
+        return next(e);
+      }
+    }
+    return res.status(HttpCode.CONFLICT).json({
+      status: "error",
+      code: HttpCode.CONFLICT,
+      message: "Email hsa alredy been verified",
+    });
+  }
+  return res.status(HttpCode.NOT_FOUND).json({
+    status: "error",
+    code: HttpCode.NOT_FOUND,
+    message: "User not found",
+  });
+};
+
 module.exports = {
   reg,
   login,
@@ -120,4 +197,6 @@ module.exports = {
   getByToken,
   updateUser,
   avatars,
+  verify,
+  repeatSendEmailverify,
 };
